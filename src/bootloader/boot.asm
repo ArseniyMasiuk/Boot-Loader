@@ -4,6 +4,9 @@
 org 0x7c00 ; Tell the assembler where this code will be loaded
 bits 16
 
+
+%define ENDL 0x0D, 0x0A
+
 ;
 ; FAT12 header
 ; 
@@ -36,29 +39,41 @@ ebr_system_id:              db 'FAT12   '           ; 8 bytes
 
 start:
 
-	mov si, helloM
-	call print_string
-	;call reboot
+    ; setup data segments
+    mov ax, 0           ; can't set ds/es directly
+    mov ds, ax
+    mov es, ax
+    
+    ; setup stack
+    mov ss, ax
+    mov sp, 0x7C00              ; stack grows downwards from where we are loaded in memory
 
-	;;;;save booted drive;;;;;;;setup data segments
-	cli 						;turn off interrupts
-	mov [ebr_drive_number], dl 	;save what drive we booted from (should be 0x0)
-	mov ax, cx					;CS = 0x0, since that's where boot sector is (0x07c00)
-	mov  ds, ax          		;DS = CS = 0x0
-	mov  es, ax          		;ES = CS = 0x0
-	mov  ss, ax          		;SS = CS = 0x0
-	mov  sp, 0x7c00      		;Stack grows down from offset 0x7C00 toward 0x0000.
-	sti                  		;Enable interrupts
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; some BIOSes might start us at 07C0:0000 instead of 0000:7C00, make sure we are in the
+    ; expected location
+    push es
+    push word .after
+    retf
+
+.after:
+
+    ; read something from floppy disk
+    ; BIOS should set DL to drive number
+    mov [ebr_drive_number], dl
+
+    ; show loading message
+    mov si, msg_loading
+    call print_string
+
 
 	;;reseting the disk system
-	mov dl, [ebr_drive_number]	;drive to reset
-	xor ax, ax					;subfnction 0
-	int 0x13					;call interrupt 0x13 
-	adc dx, 0
-	call print_hex
+    ; read drive parameters (sectors per track and head count),
+    ; instead of relying on data on formatted disk
+    push es
+    mov ah, 08h
+    int 13h
+    jc .floppy_error
+    pop es
 
-	jc boot_failure 			;display error message if carry set (error)
 
 	;mov dx, 0xfdfd
 	;call print_hex
@@ -73,11 +88,8 @@ start:
 	jmp $ ; Hang
 
 
-
-
-
-boot_failure:
-	mov si, boot_f
+.floppy_error:
+	mov si, floppy_error
 	call print_string
 	ret
 
@@ -93,9 +105,10 @@ reboot:
 %include "src/bootloader/print_string.asm"
 %include "src/bootloader/print_hex.asm"
 
-boot_f: db 'Disk error.', 0
-helloM: db 'hello world!', 0
-reboot_message: db 'Press any key to reboot', 0
+floppy_error: 				db 'Disk error.',ENDL, 0
+helloM: 				db 'hello world!',ENDL, 0
+msg_loading:            db 'Loading...',ENDL, 0
+reboot_message: 		db 'Press any key to reboot',ENDL, 0
 ;goodbyeM: db 'Goodbye', 0 
 
 ; Padding and magic number.
