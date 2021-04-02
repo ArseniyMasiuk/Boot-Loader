@@ -15,7 +15,7 @@ $(BUILD_DIR)/main_floppy.img: bootloader kernel
 	mkfs.fat -F 12 -n "NBOS" $(BUILD_DIR)/main_floppy.img
 	dd if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/main_floppy.img conv=notrunc
 	mcopy -i $(BUILD_DIR)/main_floppy.img $(BUILD_DIR)/kernel.bin "::kernel.bin"
-
+	cp $(BUILD_DIR)/main_floppy.img /mnt/d/0_Private_Data/Some\ stuff/some_projects_to_portfolio/os-dev/build/main_floppy.img
 #
 # Bootloader
 #
@@ -43,6 +43,12 @@ always:
 #
 VM:
 	qemu-system-i386 -drive format=raw,file=build/main_floppy.img
+
+#
+#bochs debugger
+#
+debug:
+	bochs -f bochs_config.bxrc
 
 #
 # Clean
